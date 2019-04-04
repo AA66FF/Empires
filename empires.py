@@ -1,0 +1,454 @@
+from random import *
+from time import *
+from graphics import *
+from math import *
+
+# Height of the window.
+screenHeight = 900
+# Width of the window.
+screenWidth = 900
+# Whether the window is open or not
+open = True
+
+fps = 30
+runFps = 0
+
+win = GraphWin("Empires", screenWidth, screenHeight)
+win.setBackground(color_rgb(0,0,0))
+win.autoflush = False
+
+t = time.time()
+t3 = time.time()
+frame = 0
+runframe = 0
+
+STAR_DEFAULT_COLOR = "#FFFFFF"
+LINK_DEFAULT_COLOR = "#555555"
+
+numberOfStars = 1000
+starMinimumSeparation = 15
+starMinimumLinks = 2
+starMaximumLinks = 3
+startEmpires = 30
+
+STAR_GROWTH_BASE = 10
+STAR_DISPLAY_RADIUS_EXP = 5/12
+STAR_DISPLAY_RADIUS_MOD = 1.5
+STAR_DISPLAY_RADIUS_BASE = 2
+STAR_DISPLAY_MAX_RADIUS = 40
+
+TURN_DELAY = 0
+
+alltimeEmpires = 0
+
+def add(v1,v2):
+    return [v1[0]+v2[0],v1[1]+v2[1]]
+
+def sub(v1,v2):
+    return [v1[0]-v2[0],v1[1]-v2[1]]
+
+def mult(v1,mult):
+    return [v1[0]*mult,v1[1]*mult]
+
+def div(v1,div):
+    return [v1[0]/div,v1[1]/div]
+
+def dist(p1,p2):
+    return sqrt((p1[0]-p2[0])**2+(p1[1]-p2[1])**2)
+
+def mag(vector):
+    return sqrt(vector[0]**2+vector[1]**2)
+
+def normalize(vector):
+    ang = 0
+    if vector[0] >= 0 and vector[1] < 0:
+        ang = atan(vector[0]/-vector[1])
+    if vector[0] > 0 and vector[1] >= 0:
+        ang = atan(-vector[1]/-vector[0])+radians(90)
+    if vector[0] <= 0 and vector[1] > 0:
+        ang = atan(vector[0]/-vector[1])+radians(180)
+    if vector[0] < 0 and vector[1] <= 0:
+        ang = atan(-vector[1]/-vector[0])+radians(270)
+    return [sin(ang),-cos(ang)]
+
+def angle(vector):
+    ang = 0
+    if vector[0] >= 0 and vector[1] < 0:
+        ang = atan(vector[0]/-vector[1])
+    if vector[0] > 0 and vector[1] >= 0:
+        ang = atan(-vector[1]/-vector[0])+radians(90)
+    if vector[0] <= 0 and vector[1] > 0:
+        ang = atan(vector[0]/-vector[1])+radians(180)
+    if vector[0] < 0 and vector[1] <= 0:
+        ang = atan(-vector[1]/-vector[0])+radians(270)
+    return ang
+
+def inside(pos,rectPos1,rectPos2):
+    if (pos[0] > rectPos1[0] and pos[0] < rectPos2[0] and pos[1] > rectPos1[1]\
+    and pos[1] < rectPos2[1]):
+        return True
+    else:
+        return False
+
+def rotate(vector, angle):
+    return [vector[0]*cos(angle)-vector[1]*sin(angle),vector[0]*sin(angle)\
+    +vector[1]*cos(angle)]
+
+def vecToPt(vector):
+    return Point(vector[0],vector[1])
+
+def sign(number):
+    if number < 0:
+        return -1
+    elif number > 0:
+        return 1
+    else:
+        return 0
+
+def randomByte():
+    return randint(0,255)
+
+stars = []
+links = []
+
+class Star:
+    # These are the only things that actually change on the screen. Empires
+    # don't draw themselves; only stars and links do.
+    def __init__(self, pos, id):
+        self.id = id
+        self.pos = pos
+        self.power = 10
+        self.links = 0
+        self.connectedTo = []
+        self.empirePrev = -1
+        # A value of -1 indicates that this star is not controlled by any
+        # empire.
+        self.empire = -1
+        self.empireColor = [255,255,255]
+        self.color = STAR_DEFAULT_COLOR
+        self.point = Point(self.pos[0],self.pos[1])
+        self.point.setOutline(self.color)
+        self.point.setFill(self.color)
+        self.circle = Circle(vecToPt(self.pos),min(sqrt(self.power),50))
+        self.turnsPassed = 0
+        self.draw()
+
+    def draw(self):
+        # Draws the star and its corresponding empire circle. Note: the empire
+        # circle may be separated into its own object in order to make the
+        # borders between empires more elegant.
+        self.point.undraw()
+        self.circle.undraw()
+        if self.empire != -1:
+            self.circle = Circle(vecToPt(self.pos),\
+            min(self.power**(STAR_DISPLAY_RADIUS_EXP)*STAR_DISPLAY_RADIUS_MOD,\
+            STAR_DISPLAY_MAX_RADIUS)+STAR_DISPLAY_RADIUS_BASE)
+            self.circle.setOutline(color_rgb(\
+            self.empireColor[0],\
+            self.empireColor[1],\
+            self.empireColor[2]))
+            self.circle.setFill(color_rgb(\
+            self.empireColor[0],\
+            self.empireColor[1],\
+            self.empireColor[2]))
+            self.circle.draw(win)
+        self.point = Point(self.pos[0],self.pos[1])
+        self.point.setOutline(self.color)
+        self.point.setFill(self.color)
+        self.point.draw(win)
+
+    def update(self):
+        # Stars under control of the same empire for long periods of time will
+        # occasionally develop themselves.
+        if self.empire != -1:
+            self.turnsPassed += 1
+        if self.empirePrev != self.empire:
+            self.turnsPassed = 0
+            self.empirePrev = self.empire
+        if self.turnsPassed >= STAR_GROWTH_BASE+self.power:
+            self.power += 1
+            self.turnsPassed = 0
+
+    def determineConnections(self):
+        # Determine the stars that this star is connected to, so that the star
+        # does not have to do it every time linkedStars() is called.
+        for i in range(len(links)):
+            if links[i].star1 == self.id:
+                self.connectedTo.append(links[i].star2)
+            if links[i].star2 == self.id:
+                self.connectedTo.append(links[i].star1)
+
+    def linkedStars(self):
+        # Returns a list of the stars that are linked to this one.
+        linked = []
+        for i in range(len(self.connectedTo)):
+            linked.append(stars[self.connectedTo[i]])
+        return linked
+
+    def linkedEmptyStars(self):
+        # Returns a list of the empty stars that are linked to this one.
+        emptyStars = []
+        linked = self.linkedStars()
+        for i in range(len(linked)):
+            if linked[i].empire == -1:
+                emptyStars.append(linked[i])
+        return emptyStars
+
+    def linkedEmpireStars(self):
+        # Return a list of the controlled stars that are linked to this one.
+        empireStars = []
+        linked = self.linkedStars()
+        for i in range(len(linked)):
+            if linked[i].empire != -1 and linked[i].empire != self.empire:
+                empireStars.append(linked[i])
+        return empireStars
+
+class Link:
+    # These connect stars together, and don't really do anything other than that.
+    def __init__(self, pos1, pos2, star1, star2):
+        self.pos1 = pos1
+        self.pos2 = pos2
+        self.star1 = star1
+        self.star2 = star2
+        self.empire = -1
+        self.color = LINK_DEFAULT_COLOR
+        self.line = Line(vecToPt(self.pos1),vecToPt(self.pos2))
+        self.line.setOutline(self.color)
+        self.line.setFill(self.color)
+        self.draw()
+
+    def draw(self):
+        self.line.undraw()
+        self.line = Line(vecToPt(self.pos1),vecToPt(self.pos2))
+        self.line.setOutline(self.color)
+        self.line.setFill(self.color)
+        self.line.draw(win)
+
+empires = []
+
+class Empire:
+    # These expand into stars and fight each other for control of them.
+    def __init__(self, id, originStar, strength):
+        self.id = id
+        self.originStar = originStar
+        self.strength = strength
+        self.resource = 0
+        self.controlledPower = 1
+        self.controlledStars = [originStar]
+        self.colonizeStars = [originStar]
+        self.empireBorderStars = []
+        self.developmentTendency = uniform(0,0.4)
+        self.colonizeTendency = uniform(0,0.2)
+        self.conquerTendency = uniform(0.1,0.5)
+        self.nextAction = ""
+        self.influenceColor = [\
+        max(randomByte(),50),\
+        max(randomByte(),50),\
+        max(randomByte(),50)\
+        ]
+        stars[originStar].empire = self.id
+        stars[originStar].empireColor = self.influenceColor
+        self.determineNextAction()
+
+    def determineNextAction(self):
+        # Weight system for determining what the empire will do next.
+        total = self.colonizeTendency+self.conquerTendency+self.developmentTendency
+        nextAction = uniform(0,total)
+        currentWeight = 0
+        if nextAction > currentWeight and nextAction < currentWeight+self.colonizeTendency:
+            self.nextAction = "colonize"
+        currentWeight += self.colonizeTendency
+        if nextAction > currentWeight and nextAction < currentWeight+self.conquerTendency:
+            self.nextAction = "conquer"
+        currentWeight += self.conquerTendency
+        if nextAction > currentWeight and nextAction < currentWeight+self.developmentTendency:
+            self.nextAction = "develop"
+        currentWeight += self.conquerTendency
+
+    def colonizeFrom(self, star):
+        # Colonizes a random empty star that is linked to star.
+        emptyStars = stars[star].linkedEmptyStars()
+        self.controlledStars.append(emptyStars[randrange(0,len(emptyStars))].id)
+        stars[self.controlledStars[len(self.controlledStars)-1]].power = 1
+        stars[self.controlledStars[len(self.controlledStars)-1]].empire = self.id
+
+    def organizeStars(self):
+        # Determines which stars are able to call colonizeFrom(), and which
+        # stars can be targeted by conquer().
+        self.colonizeStars = []
+        self.empireBorderStars = []
+        for i in range(len(self.controlledStars)):
+            linkedES = stars[self.controlledStars[i]].linkedEmptyStars()
+            # If the star has an empty star linked to it, add it to
+            # self.colonizeStars
+            if linkedES != []:
+                self.colonizeStars.append(self.controlledStars[i])
+            # Add all stars that another empire controls and that also border
+            # this star to self.empireBorderStars
+            linkedEmS = stars[self.controlledStars[i]].linkedEmpireStars()
+            for j in range(len(linkedEmS)):
+                self.empireBorderStars.append(linkedEmS[j])
+
+    def conquer(self,star):
+        # Takes a star away from another empire and converts it to this empire.
+        if ((log(empires[stars[star].empire].resource+1)+1)\
+        *((stars[star].power**1.6)/50+30)) < self.strength:
+            # Take away some of this empire's strength.
+            self.strength -= ((log(empires[stars[star].empire].resource+1)+1)\
+            *((stars[star].power**1.6)/50+30))
+            # Add the star to this empire's controlledStars.
+            self.controlledStars.append(star)
+            # Take the star away from the target's controlledStars.
+            empires[stars[star].empire].controlledStars.remove(star)
+            # Check to see if the target now has 0 stars. If so, delete that
+            # empire and change the empire ids of all empires.
+            if len(empires[stars[star].empire].controlledStars) == 0:
+                del empires[stars[star].empire]
+                for i,empire in enumerate(empires):
+                    empire.id = i
+                    for controlledStar in empire.controlledStars:
+                        stars[controlledStar].empire = empire.id
+            # Set the star's empire id to this empire's id.
+            stars[star].empire = self.id
+            # Set the star's color to white for one turn.
+            stars[star].empireColor = [255,255,255]
+            # Halve the star's power, then round it up.
+            stars[star].power = ceil(stars[star].power/2)
+
+    def update(self):
+        # This triggers every turn.
+        # Calculate the controlledPower that an empire has.
+        self.controlledPower = 0
+        for i in range(len(self.controlledStars)):
+            self.controlledPower += stars[self.controlledStars[i]].power
+        for i in range(len(self.controlledStars)):
+            # Updates all the stars to make sure that they have the correct ids.
+            # Also ticks up the strength and resource of this empire.
+            stars[self.controlledStars[i]].empire = self.id
+            stars[self.controlledStars[i]].empireColor = self.influenceColor
+        self.strength += 0.002*self.controlledPower
+        self.resource += 0.4*self.controlledPower**0.6
+        # Determine which stars can call which function.
+        self.organizeStars()
+        # Make sure that a dead empire cannot do anything.
+        if len(self.controlledStars) > 0:
+            if self.nextAction == "develop" and self.resource > 40:
+                # Add 2 power to a random star.
+                if len(self.controlledStars) == 1:
+                    r = 0
+                else:
+                    r = randrange(0,len(self.controlledStars)-1)
+                stars[self.controlledStars[r]].power += 2
+                self.resource -= 40
+                self.determineNextAction()
+            if self.nextAction == "colonize" and self.resource > 100:
+                # If there are stars left to colonize, do so. Otherwise,
+                # determine another action. Only determines another action if
+                # resource is above 100.
+                if len(self.colonizeStars) != 0:
+                    self.colonizeFrom(self.colonizeStars[randint(0,len(self.colonizeStars)-1)])
+                    self.resource -= 100
+                    self.determineNextAction()
+                else:
+                    self.determineNextAction()
+            if self.nextAction == "conquer":
+                # If there are stars left to conquer, do so. Otherwise,
+                # if there is more than 100 resource, increment strength by 5.
+                # Otherwise, determine another action.
+                if len(self.empireBorderStars) != 0:
+                    self.conquer(self.empireBorderStars[randint(0,len(self.empireBorderStars)-1)].id)
+                    self.determineNextAction()
+                elif self.resource > 100:
+                    self.resource -= 100
+                    self.strength += 10
+                    self.determineNextAction()
+                else:
+                    self.determineNextAction()
+            for i in range(len(self.controlledStars)):
+                stars[self.controlledStars[i]].empire = self.id
+            # Print the status of the empire to the console.
+            print(str(self.id)+" has "+str(round(self.resource,3))+" resource, "\
+            +str(round(self.strength,3))+" strength, "+str(len(self.controlledStars))\
+            +" stars, and "+str(self.controlledPower)+" power")
+
+# Generate the stars
+for i in range(numberOfStars):
+    stars.append(Star([randrange(10,890),randrange(10,890)],i))
+    win.update()
+
+# If the stars are too close to one another, delete one of them
+for i,star1 in reversed(list(enumerate(stars))):
+    for j,star2 in reversed(list(enumerate(stars))):
+        if i != j and dist(star1.pos,star2.pos) < starMinimumSeparation:
+            star1.point.undraw()
+            del stars[i]
+            win.update()
+            break
+
+# Reset star ids
+for i,star in enumerate(stars):
+    star.id = i
+
+# Generate the links between stars
+for i,star1 in enumerate(stars):
+    # Find the shortest distance between each star
+    distList = []
+    for j,star2 in enumerate(stars):
+        if i != j:
+            distList.append([dist(star1.pos,star2.pos),j])
+    distList = sorted(distList, key=lambda dist: dist[0])
+    # Create a random amount of links between each star
+    for j in range(randint(starMinimumLinks,starMaximumLinks)):
+        # If the link already exists, do not create it
+        alreadyExists = False
+        for link in links:
+            if link.star1 == i and link.star2 == distList[j][1]\
+            or link.star2 == i and link.star1 == distList[j][1]:
+                alreadyExists = True
+        if not alreadyExists:
+            links.append(Link(star1.pos,stars[distList[j][1]].pos,i,distList[j][1]))
+        star1.links += 1
+        win.update()
+
+for star in stars:
+    star.determineConnections()
+
+def spawnEmpire(empireId):
+    r = randint(0,len(stars)-1)
+    if stars[r].empire == -1:
+        global alltimeEmpires
+        empires.append(Empire(empireId,randint(0,len(stars)-1),1))
+        alltimeEmpires += 1
+    else:
+        spawnEmpire(empireId)
+
+for i in range(startEmpires):
+    spawnEmpire(alltimeEmpires)
+
+while open:
+# Run loop
+    # Turn loop
+    if (time.time() > t3+TURN_DELAY):
+        # Iterate through all stars, and update all of them.
+        for star in stars:
+            star.update()
+        # Verify that the empire ids are equal to their indexes.
+        for i,empire in enumerate(empires):
+            empire.id = i
+        # Iterate through all empires, and update all of them. If the length of
+        # empires changes through conquest, the loop may break itself in order
+        # to avoid a crash.
+        for i,empire in enumerate(empires):
+            if i >= len(empires):
+                break
+            empire.update()
+        t3 = time.time()
+    # Draw loop
+    if (time.time() > t+1/fps):
+        for star in stars:
+            star.draw()
+        for link in links:
+            link.draw()
+        t = time.time()
+        win.update()
+        frame += 1
