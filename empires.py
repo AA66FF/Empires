@@ -25,11 +25,11 @@ runframe = 0
 STAR_DEFAULT_COLOR = "#FFFFFF"
 LINK_DEFAULT_COLOR = "#555555"
 
-numberOfStars = 1000
-starMinimumSeparation = 15
-starMinimumLinks = 2
-starMaximumLinks = 3
-startEmpires = 30
+NUMBER_OF_STARS = 1000
+STAR_MINIMUM_SEPARATION = 12
+STAR_MINIMUM_LINKS = 2
+STAR_MAXIMUM_LINKS = 3
+NUMBER_OF_EMPIRES = 100
 
 STAR_GROWTH_BASE = 10
 STAR_DISPLAY_RADIUS_EXP = 5/12
@@ -160,6 +160,7 @@ class Star:
     def update(self):
         # Stars under control of the same empire for long periods of time will
         # occasionally develop themselves.
+        self.color = STAR_DEFAULT_COLOR
         if self.empire != -1:
             self.turnsPassed += 1
         if self.empirePrev != self.empire:
@@ -178,30 +179,58 @@ class Star:
             if links[i].star2 == self.id:
                 self.connectedTo.append(links[i].star1)
 
+    def find(self):
+        found = []
+        for i,empire in enumerate(empires):
+            for star in empire.controlledStars:
+                if self.id == star:
+                    found.append(i)
+                    break
+        return found
+
     def linkedStars(self):
         # Returns a list of the stars that are linked to this one.
         linked = []
-        for i in range(len(self.connectedTo)):
-            linked.append(stars[self.connectedTo[i]])
+        for index in self.connectedTo:
+            linked.append(stars[index])
         return linked
 
     def linkedEmptyStars(self):
         # Returns a list of the empty stars that are linked to this one.
         emptyStars = []
         linked = self.linkedStars()
-        for i in range(len(linked)):
-            if linked[i].empire == -1:
-                emptyStars.append(linked[i])
+        for link in linked:
+            if link.empire == -1:
+                emptyStars.append(link)
         return emptyStars
 
     def linkedEmpireStars(self):
         # Return a list of the controlled stars that are linked to this one.
         empireStars = []
         linked = self.linkedStars()
-        for i in range(len(linked)):
-            if linked[i].empire != -1 and linked[i].empire != self.empire:
-                empireStars.append(linked[i])
+        for link in linked:
+            if link.empire != -1 and link.empire != self.empire:
+                empireStars.append(link)
         return empireStars
+
+    def findIsolated(self, distance=0, ignoreList=[]):
+        isolated = []
+        if distance == 0:
+            ignoreList.append(self.id)
+        self.color = "#FFFF00"
+        self.draw()
+        win.update()
+        self.color = "#FF0000"
+        self.draw()
+        win.update()
+        for star in self.linkedStars():
+            if star.id not in ignoreList:
+                ignoreList.append(star.id)
+                star.findIsolated(distance+1, ignoreList)
+        for star in stars:
+            if star.id not in ignoreList:
+                isolated.append(star.id)
+        return isolated
 
 class Link:
     # These connect stars together, and don't really do anything other than that.
@@ -291,11 +320,17 @@ class Empire:
 
     def conquer(self,star):
         # Takes a star away from another empire and converts it to this empire.
-        if ((log(empires[stars[star].empire].resource+1)+1)\
-        *((stars[star].power**1.6)/50+30)) < self.strength:
+        if max((log(empires[stars[star].empire].resource+1)+1),3)\
+        *(stars[star].power/50+25) < self.strength:
             # Take away some of this empire's strength.
-            self.strength -= ((log(empires[stars[star].empire].resource+1)+1)\
-            *((stars[star].power**1.6)/50+30))
+            self.strength -= max((log(empires[stars[star].empire].resource+1)+1),3)\
+            *(stars[star].power/50+25)
+            #print(star)
+            #print(self.id)
+            #print(stars[star].find())
+            #print(stars[star].empire)
+            #print(self.controlledStars)
+            #print(empires[stars[star].empire].controlledStars)
             # Add the star to this empire's controlledStars.
             self.controlledStars.append(star)
             # Take the star away from the target's controlledStars.
@@ -326,8 +361,8 @@ class Empire:
             # Also ticks up the strength and resource of this empire.
             stars[self.controlledStars[i]].empire = self.id
             stars[self.controlledStars[i]].empireColor = self.influenceColor
-        self.strength += 0.002*self.controlledPower
-        self.resource += 0.4*self.controlledPower**0.6
+        self.strength += 0.01*self.controlledPower
+        self.resource += 0.15*self.controlledPower**0.8
         # Determine which stars can call which function.
         self.organizeStars()
         # Make sure that a dead empire cannot do anything.
@@ -360,7 +395,7 @@ class Empire:
                     self.determineNextAction()
                 elif self.resource > 100:
                     self.resource -= 100
-                    self.strength += 10
+                    self.strength += 20
                     self.determineNextAction()
                 else:
                     self.determineNextAction()
@@ -372,14 +407,14 @@ class Empire:
             +" stars, and "+str(self.controlledPower)+" power")
 
 # Generate the stars
-for i in range(numberOfStars):
+for i in range(NUMBER_OF_STARS):
     stars.append(Star([randrange(10,890),randrange(10,890)],i))
     win.update()
 
 # If the stars are too close to one another, delete one of them
 for i,star1 in reversed(list(enumerate(stars))):
     for j,star2 in reversed(list(enumerate(stars))):
-        if i != j and dist(star1.pos,star2.pos) < starMinimumSeparation:
+        if i != j and dist(star1.pos,star2.pos) < STAR_MINIMUM_SEPARATION:
             star1.point.undraw()
             del stars[i]
             win.update()
@@ -398,7 +433,7 @@ for i,star1 in enumerate(stars):
             distList.append([dist(star1.pos,star2.pos),j])
     distList = sorted(distList, key=lambda dist: dist[0])
     # Create a random amount of links between each star
-    for j in range(randint(starMinimumLinks,starMaximumLinks)):
+    for j in range(randint(STAR_MINIMUM_LINKS,STAR_MAXIMUM_LINKS)):
         # If the link already exists, do not create it
         alreadyExists = False
         for link in links:
@@ -413,6 +448,42 @@ for i,star1 in enumerate(stars):
 for star in stars:
     star.determineConnections()
 
+tryingStar = 0
+isolatedStars = 0
+
+while True:
+    isolatedStars = stars[tryingStar].findIsolated()
+    if len(isolatedStars) > 100:
+        tryingStar += 1
+    else:
+        break
+
+for i,index in list(enumerate(isolatedStars)):
+    isolatedStars[i] = stars[index]
+
+groups = []
+
+for star in isolatedStars:
+    starIsolatedGroup = star.findIsolated(0, [])
+    if starIsolatedGroup not in groups:
+        groups.append(starIsolatedGroup)
+
+for group in groups:
+    starsToConnect = []
+    for star in stars:
+        if star.id not in group:
+            starsToConnect.append(star.id)
+    distList = []
+    for i1 in starsToConnect:
+        for i2 in group:
+            distList.append([dist(stars[i1].pos,stars[i2].pos),i1,i2])
+    distList = sorted(distList, key=lambda dist: dist[0])
+    links.append(Link(stars[distList[0][1]].pos,stars[distList[0][2]].pos,\
+    distList[0][1],distList[0][2]))
+
+for star in stars:
+    star.determineConnections()
+
 def spawnEmpire(empireId):
     r = randint(0,len(stars)-1)
     if stars[r].empire == -1:
@@ -422,13 +493,18 @@ def spawnEmpire(empireId):
     else:
         spawnEmpire(empireId)
 
-for i in range(startEmpires):
+for i in range(NUMBER_OF_EMPIRES):
     spawnEmpire(alltimeEmpires)
 
 while open:
 # Run loop
     # Turn loop
     if (time.time() > t3+TURN_DELAY):
+        # Make sure a star can only be controlled by one empire.
+        for star in stars:
+            for i,empireId in enumerate(star.find()):
+                if star.empire != empireId:
+                    empires[empireId].controlledStars.remove(star.id)
         # Iterate through all stars, and update all of them.
         for star in stars:
             star.update()
