@@ -29,7 +29,7 @@ NUMBER_OF_STARS = 1000
 STAR_MINIMUM_SEPARATION = 12
 STAR_MINIMUM_LINKS = 2
 STAR_MAXIMUM_LINKS = 3
-NUMBER_OF_EMPIRES = 100
+NUMBER_OF_EMPIRES = 50
 
 STAR_GROWTH_BASE = 10
 STAR_DISPLAY_RADIUS_EXP = 5/12
@@ -232,6 +232,14 @@ class Star:
                 isolated.append(star.id)
         return isolated
 
+    def linksToStar(self, starToFind, distance=0, ignoreList=[]):
+        if distance == 0:
+            ignoreList.append(self.id)
+        for star in self.linkedStars():
+            if star.id not in ignoreList:
+                ignoreList.append(star.id)
+                result = star.linksToStar(starToFind, distance+1, list(ignoreList))
+
 class Link:
     # These connect stars together, and don't really do anything other than that.
     def __init__(self, pos1, pos2, star1, star2):
@@ -402,9 +410,9 @@ class Empire:
             for i in range(len(self.controlledStars)):
                 stars[self.controlledStars[i]].empire = self.id
             # Print the status of the empire to the console.
-            print(str(self.id)+" has "+str(round(self.resource,3))+" resource, "\
-            +str(round(self.strength,3))+" strength, "+str(len(self.controlledStars))\
-            +" stars, and "+str(self.controlledPower)+" power")
+        print(str(self.id)+" has "+str(round(self.resource,3))+" resource, "\
+        +str(round(self.strength,3))+" strength, "+str(len(self.controlledStars))\
+        +" stars, and "+str(self.controlledPower)+" power")
 
 # Generate the stars
 for i in range(NUMBER_OF_STARS):
