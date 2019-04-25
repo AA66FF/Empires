@@ -3,17 +3,38 @@ from time import *
 from graphics import *
 from math import *
 
-# Height of the window.
-screenHeight = 900
-# Width of the window.
-screenWidth = 900
-# Whether the window is open or not
-open = True
+# You can change these
+SCREEN_HEIGHT = 900
+SCREEN_WIDTH = 900
 
+STAR_DEFAULT_COLOR = "#FFFFFF"
+ORIGIN_STAR_COLOR = "#FFFF55"
+LINK_DEFAULT_COLOR = "#555555"
+
+NUMBER_OF_STARS = 700
+STAR_MINIMUM_SEPARATION = 10
+STAR_MINIMUM_LINKS = 2
+STAR_MAXIMUM_LINKS = 3
+NUMBER_OF_EMPIRES = 30
+
+STAR_GROWTH_BASE = 10
+
+STAR_DISPLAY_RADIUS_EXP = 6/12
+STAR_DISPLAY_RADIUS_MOD = 0.8
+STAR_DISPLAY_RADIUS_BASE = 3
+STAR_DISPLAY_MAX_RADIUS = 15
+
+ISOLATED_CHECK_DRAW = True
+DRAW_LINKS = True
+UPDATE_LINKS = False
+PRINT_EMPIRE_STATUS = True
+
+TURN_DELAY = 0.04 # In seconds
+
+# Don't change these
 fps = 60
-runFps = 0
 
-win = GraphWin("Empires", screenWidth, screenHeight)
+win = GraphWin("Empires", SCREEN_WIDTH, SCREEN_HEIGHT)
 win.setBackground(color_rgb(0,0,0))
 win.autoflush = False
 
@@ -21,28 +42,7 @@ t = time.time()
 t3 = time.time()
 frame = 0
 timer = 0
-
-STAR_DEFAULT_COLOR = "#FFFFFF"
-LINK_DEFAULT_COLOR = "#555555"
-
-NUMBER_OF_STARS = 1000
-STAR_MINIMUM_SEPARATION = 10
-STAR_MINIMUM_LINKS = 2
-STAR_MAXIMUM_LINKS = 3
-NUMBER_OF_EMPIRES = 100
-
-STAR_GROWTH_BASE = 10
-STAR_DISPLAY_RADIUS_EXP = 5/12
-STAR_DISPLAY_RADIUS_MOD = 1.5
-STAR_DISPLAY_RADIUS_BASE = 2
-STAR_DISPLAY_MAX_RADIUS = 40
-
-ISOLATED_CHECK_DRAW = False
-DRAW_LINKS = True
-UPDATE_LINKS = False
-PRINT_EMPIRE_STATUS = True
-
-TURN_DELAY = 0
+open = True
 
 alltimeEmpires = 0
 
@@ -122,10 +122,14 @@ class Star:
     def __init__(self, pos, id):
         self.id = id
         self.pos = pos
+        self.homeStar = False
         self.power = 10
         self.links = 0
         self.connectedTo = []
         self.empirePrev = -1
+        self.radius = floor(min(self.power**(STAR_DISPLAY_RADIUS_EXP)*STAR_DISPLAY_RADIUS_MOD,\
+        STAR_DISPLAY_MAX_RADIUS)+STAR_DISPLAY_RADIUS_BASE)
+        self.oldRadius = self.radius
         # A value of -1 indicates that this star is not controlled by any
         # empire.
         self.empire = -1
@@ -137,7 +141,6 @@ class Star:
         self.point.setFill(self.color)
         self.circle = Circle(vecToPt(self.pos),min(sqrt(self.power),50))
         self.turnsPassed = 0
-        self.draw()
 
     def draw(self):
         # Draws the star and its corresponding empire circle. Note: the empire
@@ -146,9 +149,7 @@ class Star:
         self.point.undraw()
         self.circle.undraw()
         if self.empire != -1:
-            self.circle = Circle(vecToPt(self.pos),\
-            min(self.power**(STAR_DISPLAY_RADIUS_EXP)*STAR_DISPLAY_RADIUS_MOD,\
-            STAR_DISPLAY_MAX_RADIUS)+STAR_DISPLAY_RADIUS_BASE)
+            self.circle = Circle(vecToPt(self.pos),self.radius)
             self.circle.setOutline(color_rgb(\
             self.empireColor[0],\
             self.empireColor[1],\
@@ -168,8 +169,21 @@ class Star:
         # Stars under control of the same empire for long periods of time will
         # occasionally develop themselves.
         self.color = STAR_DEFAULT_COLOR
+        self.radius = floor(min(self.power**(STAR_DISPLAY_RADIUS_EXP)*STAR_DISPLAY_RADIUS_MOD,\
+        STAR_DISPLAY_MAX_RADIUS)+STAR_DISPLAY_RADIUS_BASE)
+        self.homeStar = False
+        if self.radius != self.oldRadius:
+            self.changed = True
+            self.oldRadius = self.radius
         if self.empire != -1:
+            if empires[self.empire].originStar == self.id:
+                self.homeStar = True
             self.turnsPassed += 1
+        if self.homeStar:
+            self.turnsPassed += 3
+            self.color = ORIGIN_STAR_COLOR
+        else:
+            self.color = STAR_DEFAULT_COLOR
         if self.empirePrev != self.empire:
             self.turnsPassed = 0
             self.empirePrev = self.empire
@@ -177,7 +191,6 @@ class Star:
         if self.turnsPassed >= STAR_GROWTH_BASE+self.power:
             self.power += 1
             self.turnsPassed = 0
-            self.changed = True
 
     def determineConnections(self):
         # Determine the stars that this star is connected to, so that the star
@@ -397,7 +410,6 @@ class Empire:
                 else:
                     r = randrange(0,len(self.controlledStars)-1)
                 stars[self.controlledStars[r]].power += 2
-                stars[self.controlledStars[r]].changed = True
                 self.resource -= 40
                 self.determineNextAction()
             if self.nextAction == "colonize" and self.resource > 100:
@@ -433,10 +445,22 @@ class Empire:
 
 # Generate the stars
 for i in range(NUMBER_OF_STARS):
-    stars.append(Star([randrange(10,890),randrange(10,890)],i))
+    while True:
+        respawn = False
+        starToAdd = Star([randint(10,SCREEN_WIDTH-10),randint(10,SCREEN_HEIGHT-10)],i)
+        if len(stars) > 0:
+            for otherStar in stars:
+                if dist(starToAdd.pos,otherStar.pos) < STAR_MINIMUM_SEPARATION:
+                    respawn = True
+        if not respawn:
+            starToAdd.draw()
+            stars.append(starToAdd)
+            break
     win.update()
 
 # If the stars are too close to one another, delete one of them
+# This is now just a failsafe - the star generation algorithm removes close
+# stars by itself now
 for i,star1 in reversed(list(enumerate(stars))):
     for j,star2 in reversed(list(enumerate(stars))):
         if i != j and dist(star1.pos,star2.pos) < STAR_MINIMUM_SEPARATION:
@@ -523,7 +547,6 @@ def spawnEmpire(empireId):
     global alltimeEmpires
     r = randint(0,len(stars)-1)
     print(r,alltimeEmpires,stars[r].empire)
-    sleep(0.1)
     if stars[r].empire == -1 and len(stars[r].find()) == 0:
         empires.append(Empire(empireId,r,1))
         alltimeEmpires += 1
@@ -537,7 +560,6 @@ for i in range(NUMBER_OF_EMPIRES):
 timer = 0
 
 while open:
-    # Run loop
     # Turn loop
     if (time.time() > t3+TURN_DELAY):
         print(timer)
@@ -549,7 +571,6 @@ while open:
                         empires[empireId].controlledStars.remove(star.id)
             # Delete empires with 0 stars.
             for empire in empires:
-                print(len(empire.controlledStars)==0)
                 if len(empire.controlledStars) == 0:
                     del empires[empire.id]
         # Iterate through all stars, and update all of them.
@@ -569,7 +590,6 @@ while open:
             empire.update()
         timer += 1
         t3 = time.time()
-
     # Draw loop
     if (time.time() > t+1/fps):
         for star in stars:
