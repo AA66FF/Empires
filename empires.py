@@ -141,6 +141,7 @@ class Star:
         self.point.setFill(self.color)
         self.circle = Circle(vecToPt(self.pos),min(sqrt(self.power),50))
         self.turnsPassed = 0
+        self.revoltTimer = 0
 
     def draw(self):
         # Draws the star and its corresponding empire circle. Note: the empire
@@ -148,6 +149,8 @@ class Star:
         # borders between empires more elegant.
         self.point.undraw()
         self.circle.undraw()
+        if self.revoltTimer > 0:
+            self.empireColor = [255,255,255]
         if self.empire != -1:
             self.circle = Circle(vecToPt(self.pos),self.radius)
             self.circle.setOutline(color_rgb(\
@@ -179,6 +182,7 @@ class Star:
             if empires[self.empire].originStar == self.id:
                 self.homeStar = True
             self.turnsPassed += 1
+            self.revoltTimer -= 1
         if self.homeStar:
             self.turnsPassed += 3
             self.color = ORIGIN_STAR_COLOR
@@ -416,7 +420,8 @@ class Empire:
                     newEmpire.controlledStars.append(star)
                     self.controlledStars.remove(star)
                     stars[star].empire = newEmpire.id
-                    stars[star].empireColor = newEmpire.influenceColor
+                    stars[star].revoltTimer = 6
+                    stars[star].changed = True
             empires.append(newEmpire)
 
     def update(self):
@@ -432,7 +437,7 @@ class Empire:
             stars[self.controlledStars[i]].empireColor = self.influenceColor
         self.strength += 0.01*self.controlledPower
         self.resource += 0.15*self.controlledPower**0.8
-        self.revoltRisk = max((log10(len(self.controlledStars))-1.5)/100,0)
+        self.revoltRisk = max((log10(len(self.controlledStars))-1.5)/40,0)
         # Determine which stars can call which function.
         self.organizeStars()
         if len(self.controlledStars) > 0:
