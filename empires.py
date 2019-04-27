@@ -29,7 +29,7 @@ DRAW_LINKS = True
 UPDATE_LINKS = False
 PRINT_EMPIRE_STATUS = True
 
-TURN_DELAY = 0.04 # In seconds
+TURN_DELAY = 0.1 # In seconds
 
 # Don't change these
 fps = 60
@@ -182,8 +182,6 @@ class Star:
         if self.homeStar:
             self.turnsPassed += 3
             self.color = ORIGIN_STAR_COLOR
-        else:
-            self.color = STAR_DEFAULT_COLOR
         if self.empirePrev != self.empire:
             self.turnsPassed = 0
             self.empirePrev = self.empire
@@ -264,6 +262,25 @@ class Star:
                 ignoreList.append(star.id)
                 result = star.linksToStar(starToFind, distance+1, list(ignoreList))
 
+    def starsWithinDistance(self, recursionsToDo, listOfStars=[]):
+        if self.id not in listOfStars:
+            listOfStars.append(self.id)
+        #print(recursionsToDo)
+        #self.color = "#FFFF00"
+        #self.draw()
+        #win.update()
+        #if self.id == listOfStars[0]:
+        #    self.color = "#00FF00"
+        #else:
+        #    self.color = "#FF0000"
+        #self.draw()
+        #win.update()
+        #self.changed = True
+        if recursionsToDo > 0:
+            for star in self.linkedStars():
+                star.starsWithinDistance(recursionsToDo-1, listOfStars)
+        return listOfStars
+
 class Link:
     # These connect stars together, and don't really do anything other than that.
     def __init__(self, pos1, pos2, star1, star2):
@@ -285,7 +302,6 @@ class Link:
         self.line.setFill(self.color)
         self.line.draw(win)
 
-
 empires = []
 
 class Empire:
@@ -295,6 +311,7 @@ class Empire:
         self.originStar = originStar
         self.strength = strength
         self.resource = 0
+        self.revoltRisk = 0
         self.controlledPower = strength
         self.controlledStars = [originStar]
         self.colonizeStars = [originStar]
@@ -325,7 +342,6 @@ class Empire:
         currentWeight += self.conquerTendency
         if nextAction > currentWeight and nextAction < currentWeight+self.developmentTendency:
             self.nextAction = "develop"
-        currentWeight += self.conquerTendency
 
     def colonizeFrom(self, star):
         # Colonizes a random empty star that is linked to star.
@@ -386,8 +402,20 @@ class Empire:
             # Halve the star's power, then round it up.
             stars[star].power = ceil(stars[star].power/2)
 
+    def revolt(self):
+        # Causes another empire to fragment from this one.
+        randomStar = randint(0,len(self.controlledStars)-1)
+        newEmpireStrength = len(self.controlledStars)**1.5
+        revoltingStars = stars[randomStar].starsWithinDistance(3,[])
+        if self.originStar not in revoltingStars:
+            newEmpire = Empire(len(empires),randomStar,newEmpireStrength)
+            for star in revoltingStars:
+                if star in self.controlledStars:
+                    newEmpire.controlledStars.append(star)
+                    self.controlledStars.remove(star)
+
     def update(self):
-        # This triggers every turn.
+        # This is called on every turn.
         # Calculate the controlledPower that an empire has.
         self.controlledPower = 0
         for i in range(len(self.controlledStars)):
@@ -399,9 +427,9 @@ class Empire:
             stars[self.controlledStars[i]].empireColor = self.influenceColor
         self.strength += 0.01*self.controlledPower
         self.resource += 0.15*self.controlledPower**0.8
+        self.revoltRisk = max((log10(len(self.controlledStars))-1.5)/100,0)
         # Determine which stars can call which function.
         self.organizeStars()
-        # Make sure that a dead empire cannot do anything.
         if len(self.controlledStars) > 0:
             if self.nextAction == "develop" and self.resource > 40:
                 # Add 2 power to a random star.
@@ -435,6 +463,8 @@ class Empire:
                     self.determineNextAction()
                 else:
                     self.determineNextAction()
+            if random() < self.revoltRisk:
+                self.revolt()
             for i in range(len(self.controlledStars)):
                 stars[self.controlledStars[i]].empire = self.id
         # Print the status of the empire to the console.
