@@ -414,7 +414,7 @@ class Empire:
     def revolt(self):
         # Causes another empire to fragment from this one.
         randomStar = self.controlledStars[randint(0,len(self.controlledStars)-1)]
-        newEmpireStrength = len(self.controlledStars)**1.5
+        newEmpireStrength = len(self.controlledStars)**1.3*3+1000
         revoltingStars = stars[randomStar].starsWithinDistance(2,[])
         if self.originStar not in revoltingStars:
             newEmpire = Empire(len(empires),randomStar,newEmpireStrength)
