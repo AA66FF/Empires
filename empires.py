@@ -420,7 +420,7 @@ class Empire:
                     newEmpire.controlledStars.append(star)
                     self.controlledStars.remove(star)
                     stars[star].empire = newEmpire.id
-                    stars[star].revoltTimer = 6
+                    stars[star].revoltTimer = 3
                     stars[star].changed = True
             empires.append(newEmpire)
 
