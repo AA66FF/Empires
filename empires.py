@@ -38,6 +38,10 @@ win = GraphWin("Empires", SCREEN_WIDTH, SCREEN_HEIGHT)
 win.setBackground(color_rgb(0,0,0))
 win.autoflush = False
 
+graph = GraphWin("Graph", 500, 500)
+graph.setBackground("#000000")
+graph.autoflush = False
+
 t = time.time()
 t3 = time.time()
 frame = 0
@@ -115,6 +119,8 @@ def randomByte():
 
 stars = []
 links = []
+points = []
+empires = []
 
 class Star:
     # These are the only things that actually change on the screen. Empires
@@ -311,7 +317,18 @@ class Link:
         self.line.setFill(self.color)
         self.line.draw(win)
 
-empires = []
+class DataPoint:
+    def __init__(self, x, y, color):
+        self.point = Point(x,y)
+        self.color = color
+        self.point.setFill(color_rgb(self.color[0],self.color[1],self.color[2]))
+        self.point.setOutline(color_rgb(self.color[0],self.color[1],self.color[2]))
+        self.point.draw(graph)
+
+    def update(self):
+        self.point.move(-1,0)
+        if self.point.getX() < 0:
+            self.point.undraw()
 
 class Empire:
     # These expand into stars and fight each other for control of them.
@@ -616,6 +633,16 @@ while open:
     # Turn loop
     if (time.time() > t3+TURN_DELAY):
         print(timer)
+        if (timer % 10 == 0):
+            for empire in empires:
+                points.append(DataPoint(\
+                499,\
+                500-empire.controlledPower/40,\
+                empire.influenceColor))
+            for i,point in enumerate(points):
+                point.update()
+                if point.point.getX() < 0:
+                    del points[i]
         if timer % 20 == 0:
             # Make sure a star can only be controlled by one empire.
             for star in stars:
