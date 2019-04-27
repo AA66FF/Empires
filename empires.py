@@ -423,6 +423,7 @@ class Empire:
         elif len(self.controlledStars) > 200 and len(self.controlledStars) <= 400:
             revoltSize = 3
         elif len(self.controlledStars) > 400:
+            revoltSize = 4
         revoltingStars = stars[randomStar].starsWithinDistance(3,[])
         if self.originStar not in revoltingStars:
             newEmpire = Empire(len(empires),randomStar,newEmpireStrength)
