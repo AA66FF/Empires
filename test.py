@@ -1,3 +1,1 @@
-exampleList = ["Bob","Alex","Potato"]
-for index, entry in enumerate(exampleList):
-    print(index, entry)
+print(list(range(20)))

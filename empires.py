@@ -142,6 +142,7 @@ class Star:
         self.circle = Circle(vecToPt(self.pos),min(sqrt(self.power),50))
         self.turnsPassed = 0
         self.revoltTimer = 0
+        self.revolt = False
 
     def draw(self):
         # Draws the star and its corresponding empire circle. Note: the empire
@@ -149,7 +150,7 @@ class Star:
         # borders between empires more elegant.
         self.point.undraw()
         self.circle.undraw()
-        if self.revoltTimer > 0:
+        if self.revoltTimer > 0 and self.revolt:
             self.empireColor = [255,255,255]
         if self.empire != -1:
             self.circle = Circle(vecToPt(self.pos),self.radius)
@@ -179,10 +180,14 @@ class Star:
             self.changed = True
             self.oldRadius = self.radius
         if self.empire != -1:
-            if empires[self.empire].originStar == self.id:
-                self.homeStar = True
+            if self.empire in list(range(len(empires))):
+                if empires[self.empire].originStar == self.id:
+                    self.homeStar = True
             self.turnsPassed += 1
-            self.revoltTimer -= 1
+        self.revoltTimer -= 1
+        if self.revoltTimer < 0 and self.revolt:
+            self.revolt = False
+            self.changed = True
         if self.homeStar:
             self.turnsPassed += 3
             self.color = ORIGIN_STAR_COLOR
@@ -410,9 +415,7 @@ class Empire:
         # Causes another empire to fragment from this one.
         randomStar = self.controlledStars[randint(0,len(self.controlledStars)-1)]
         newEmpireStrength = len(self.controlledStars)**1.5
-        revoltingStars = stars[randomStar].starsWithinDistance(3,[])
-        print(randomStar)
-        print(revoltingStars)
+        revoltingStars = stars[randomStar].starsWithinDistance(2,[])
         if self.originStar not in revoltingStars:
             newEmpire = Empire(len(empires),randomStar,newEmpireStrength)
             for star in revoltingStars:
@@ -420,7 +423,7 @@ class Empire:
                     newEmpire.controlledStars.append(star)
                     self.controlledStars.remove(star)
                     stars[star].empire = newEmpire.id
-                    stars[star].revoltTimer = 3
+                    stars[star].revoltTimer = 2
                     stars[star].changed = True
             empires.append(newEmpire)
 
