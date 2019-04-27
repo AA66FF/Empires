@@ -415,7 +415,15 @@ class Empire:
         # Causes another empire to fragment from this one.
         randomStar = self.controlledStars[randint(0,len(self.controlledStars)-1)]
         newEmpireStrength = len(self.controlledStars)**1.3*3+1000
-        revoltingStars = stars[randomStar].starsWithinDistance(2,[])
+        revoltSize = 0
+        if len(self.controlledStars) <= 100:
+            revoltSize = 1
+        elif len(self.controlledStars) > 100 and len(self.controlledStars) <= 200:
+            revoltSize = 2
+        elif len(self.controlledStars) > 200 and len(self.controlledStars) <= 400:
+            revoltSize = 3
+        elif len(self.controlledStars) > 400:
+        revoltingStars = stars[randomStar].starsWithinDistance(3,[])
         if self.originStar not in revoltingStars:
             newEmpire = Empire(len(empires),randomStar,newEmpireStrength)
             for star in revoltingStars:
@@ -441,7 +449,7 @@ class Empire:
             stars[self.controlledStars[i]].empireColor = self.influenceColor
         self.strength += 0.01*self.controlledPower
         self.resource += 0.15*self.controlledPower**0.8
-        self.revoltRisk = max((log10(len(self.controlledStars))-1.5)/40,0)
+        self.revoltRisk = max((log10(len(self.controlledStars))-1.5)/60,0)
         # Determine which stars can call which function.
         self.organizeStars()
         if len(self.controlledStars) > 0:
