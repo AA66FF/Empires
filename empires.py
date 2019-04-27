@@ -424,7 +424,7 @@ class Empire:
             revoltSize = 3
         elif len(self.controlledStars) > 400:
             revoltSize = 4
-        revoltingStars = stars[randomStar].starsWithinDistance(3,[])
+        revoltingStars = stars[randomStar].starsWithinDistance(revoltSize,[])
         if self.originStar not in revoltingStars:
             newEmpire = Empire(len(empires),randomStar,newEmpireStrength)
             for star in revoltingStars:
