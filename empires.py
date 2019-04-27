@@ -424,6 +424,7 @@ class Empire:
                     self.controlledStars.remove(star)
                     stars[star].empire = newEmpire.id
                     stars[star].revoltTimer = 2
+                    stars[star].revolt = True
                     stars[star].changed = True
             empires.append(newEmpire)
 
