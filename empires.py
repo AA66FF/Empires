@@ -38,7 +38,7 @@ win = GraphWin("Empires", SCREEN_WIDTH, SCREEN_HEIGHT)
 win.setBackground(color_rgb(0,0,0))
 win.autoflush = False
 
-graph = GraphWin("Graph", 500, 500)
+graph = GraphWin("Graph", 1500, 500)
 graph.setBackground("#000000")
 graph.autoflush = False
 
@@ -324,10 +324,11 @@ class DataPoint:
         self.point.setFill(color_rgb(self.color[0],self.color[1],self.color[2]))
         self.point.setOutline(color_rgb(self.color[0],self.color[1],self.color[2]))
         self.point.draw(graph)
+        self.age = 0
 
     def update(self):
-        self.point.move(-1,0)
-        if self.point.getX() < 0:
+        self.age += 1
+        if self.age > 1498:
             self.point.undraw()
 
 class Empire:
@@ -440,7 +441,7 @@ class Empire:
             revoltSize = 3
         elif len(self.controlledStars) > 400:
             revoltSize = 4
-        newEmpireStrength = len(self.controlledStars)**1.3*3+500*revoltSize
+        newEmpireStrength = len(self.controlledStars)**1.45*3+500*revoltSize
         revoltingStars = stars[randomStar].starsWithinDistance(revoltSize,[])
         if self.originStar not in revoltingStars:
             newEmpire = Empire(len(empires),randomStar,newEmpireStrength)
@@ -467,7 +468,8 @@ class Empire:
             stars[self.controlledStars[i]].empireColor = self.influenceColor
         self.strength += 0.01*self.controlledPower
         self.resource += 0.15*self.controlledPower**0.8
-        self.revoltRisk = max((log10(len(self.controlledStars))-1.5)/80,0)
+        self.revoltRisk = max((log10(len(self.controlledStars))-1.5)\
+        /(60+self.resource**0.28),0)
         # Determine which stars can call which function.
         self.organizeStars()
         if len(self.controlledStars) > 0:
@@ -636,12 +638,12 @@ while open:
         if (timer % 10 == 0):
             for empire in empires:
                 points.append(DataPoint(\
-                499,\
+                floor(timer/10)%1500,\
                 500-empire.controlledPower/40,\
                 empire.influenceColor))
             for i,point in enumerate(points):
                 point.update()
-                if point.point.getX() < 0:
+                if point.age > 1500:
                     del points[i]
         if timer % 20 == 0:
             # Make sure a star can only be controlled by one empire.
