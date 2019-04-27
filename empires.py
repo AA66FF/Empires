@@ -15,7 +15,7 @@ NUMBER_OF_STARS = 700
 STAR_MINIMUM_SEPARATION = 10
 STAR_MINIMUM_LINKS = 2
 STAR_MAXIMUM_LINKS = 3
-NUMBER_OF_EMPIRES = 1
+NUMBER_OF_EMPIRES = 30
 
 STAR_GROWTH_BASE = 10
 
@@ -431,7 +431,7 @@ class Empire:
             stars[self.controlledStars[i]].empireColor = self.influenceColor
         self.strength += 0.01*self.controlledPower
         self.resource += 0.15*self.controlledPower**0.8
-        self.revoltRisk = max((log10(len(self.controlledStars))-1.5)/10,0)
+        self.revoltRisk = max((log10(len(self.controlledStars))-1.5)/100,0)
         # Determine which stars can call which function.
         self.organizeStars()
         if len(self.controlledStars) > 0:
