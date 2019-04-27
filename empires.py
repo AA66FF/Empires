@@ -15,7 +15,7 @@ NUMBER_OF_STARS = 700
 STAR_MINIMUM_SEPARATION = 10
 STAR_MINIMUM_LINKS = 2
 STAR_MAXIMUM_LINKS = 3
-NUMBER_OF_EMPIRES = 30
+NUMBER_OF_EMPIRES = 1
 
 STAR_GROWTH_BASE = 10
 
@@ -29,7 +29,7 @@ DRAW_LINKS = True
 UPDATE_LINKS = False
 PRINT_EMPIRE_STATUS = True
 
-TURN_DELAY = 0.1 # In seconds
+TURN_DELAY = 0.02 # In seconds
 
 # Don't change these
 fps = 60
@@ -404,15 +404,19 @@ class Empire:
 
     def revolt(self):
         # Causes another empire to fragment from this one.
-        randomStar = randint(0,len(self.controlledStars)-1)
+        randomStar = self.controlledStars[randint(0,len(self.controlledStars)-1)]
         newEmpireStrength = len(self.controlledStars)**1.5
         revoltingStars = stars[randomStar].starsWithinDistance(3,[])
+        print(randomStar)
+        print(revoltingStars)
         if self.originStar not in revoltingStars:
             newEmpire = Empire(len(empires),randomStar,newEmpireStrength)
             for star in revoltingStars:
                 if star in self.controlledStars:
                     newEmpire.controlledStars.append(star)
                     self.controlledStars.remove(star)
+                    stars[star].empire = newEmpire.id
+            empires.append(newEmpire)
 
     def update(self):
         # This is called on every turn.
@@ -427,7 +431,7 @@ class Empire:
             stars[self.controlledStars[i]].empireColor = self.influenceColor
         self.strength += 0.01*self.controlledPower
         self.resource += 0.15*self.controlledPower**0.8
-        self.revoltRisk = max((log10(len(self.controlledStars))-1.5)/100,0)
+        self.revoltRisk = max((log10(len(self.controlledStars))-1.5)/10,0)
         # Determine which stars can call which function.
         self.organizeStars()
         if len(self.controlledStars) > 0:
@@ -452,14 +456,14 @@ class Empire:
                     self.determineNextAction()
             if self.nextAction == "conquer":
                 # If there are stars left to conquer, do so. Otherwise,
-                # if there is more than 100 resource, increment strength by 5.
+                # if there is more than 100 resource, increment strength by 100.
                 # Otherwise, determine another action.
                 if len(self.empireBorderStars) != 0:
                     self.conquer(self.empireBorderStars[randint(0,len(self.empireBorderStars)-1)].id)
                     self.determineNextAction()
                 elif self.resource > 100:
                     self.resource -= 100
-                    self.strength += 20
+                    self.strength += 100
                     self.determineNextAction()
                 else:
                     self.determineNextAction()
