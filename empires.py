@@ -29,7 +29,7 @@ DRAW_LINKS = True
 UPDATE_LINKS = False
 PRINT_EMPIRE_STATUS = True
 
-TURN_DELAY = 0.1 # In seconds
+TURN_DELAY = 0.04 # In seconds
 
 # Don't change these
 fps = 60
