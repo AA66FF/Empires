@@ -569,6 +569,8 @@ for i,star1 in enumerate(stars):
 for star in stars:
     star.determineConnections()
 
+
+# Make sure all the stars are connected to each other.
 while True:
     tryingStar = 0
     isolatedStars = []
