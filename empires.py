@@ -18,6 +18,7 @@ STAR_MAXIMUM_LINKS = 3
 NUMBER_OF_EMPIRES = 30
 
 STAR_GROWTH_BASE = 10
+REVOLUTIONARY_WAVE_CHANCE = 0.00005
 
 STAR_DISPLAY_RADIUS_EXP = 6/12
 STAR_DISPLAY_RADIUS_MOD = 0.8
@@ -339,6 +340,7 @@ class Empire:
         self.strength = strength
         self.resource = 0
         self.revoltRisk = 0
+        self.revoltRiskMod = 1
         self.controlledPower = strength
         self.controlledStars = [originStar]
         self.colonizeStars = [originStar]
@@ -454,6 +456,7 @@ class Empire:
                     stars[star].revolt = True
                     stars[star].changed = True
             empires.append(newEmpire)
+            self.revoltRiskMod -= 0.5
 
     def update(self):
         # This is called on every turn.
@@ -468,8 +471,9 @@ class Empire:
             stars[self.controlledStars[i]].empireColor = self.influenceColor
         self.strength += 0.01*self.controlledPower
         self.resource += 0.15*self.controlledPower**0.8
+        self.revoltRiskMod += 0.00003*len(self.controlledStars)
         self.revoltRisk = max((log10(len(self.controlledStars))-1.5)\
-        /(60+self.resource**0.28),0)
+        /(60+self.resource**0.28),0)*self.revoltRiskMod
         # Determine which stars can call which function.
         self.organizeStars()
         if len(self.controlledStars) > 0:
@@ -505,6 +509,8 @@ class Empire:
                     self.determineNextAction()
                 else:
                     self.determineNextAction()
+            if random() < REVOLUTIONARY_WAVE_CHANCE and len(self.controlledStars) > 100:
+                self.revoltRiskMod += 10
             if random() < self.revoltRisk:
                 self.revolt()
             for i in range(len(self.controlledStars)):
@@ -513,7 +519,7 @@ class Empire:
         if PRINT_EMPIRE_STATUS:
             print(str(self.id)+" has "+str(round(self.resource,3))+" resource, "\
             +str(round(self.strength,3))+" strength, "+str(len(self.controlledStars))\
-            +" stars, and "+str(self.controlledPower)+" power")
+            +" stars, "+str(self.controlledPower)+" power, "+str(self.revoltRiskMod)+" mod")
 
 # Generate the stars
 for i in range(NUMBER_OF_STARS):
