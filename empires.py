@@ -18,7 +18,7 @@ STAR_MAXIMUM_LINKS = 3
 NUMBER_OF_EMPIRES = 30
 
 STAR_GROWTH_BASE = 10
-REVOLUTIONARY_WAVE_CHANCE = 0.00005
+REVOLUTIONARY_WAVE_CHANCE = 0.0002
 
 STAR_DISPLAY_RADIUS_EXP = 6/12
 STAR_DISPLAY_RADIUS_MOD = 0.8
@@ -335,12 +335,18 @@ class DataPoint:
 class Empire:
     # These expand into stars and fight each other for control of them.
     def __init__(self, id, originStar, strength):
+        global alltimeEmpires
         self.id = id
+        self.number = alltimeEmpires
+        alltimeEmpires += 1
         self.originStar = originStar
         self.strength = strength
         self.resource = 0
+        self.technology = 0
+        self.technologyMod = 1
         self.revoltRisk = 0
         self.revoltRiskMod = 1
+        self.revolutionTimer = -1
         self.controlledPower = strength
         self.controlledStars = [originStar]
         self.colonizeStars = [originStar]
@@ -398,23 +404,30 @@ class Empire:
             for j in range(len(linkedEmS)):
                 self.empireBorderStars.append(linkedEmS[j])
 
+    def research(self):
+        self.resource -= 30000*self.technologyMod**1.2
+        self.technology += 1
+        self.technologyMod = 1.04**self.technology
+
     def conquer(self,star):
         # Takes a star away from another empire and converts it to this empire.
-        if max((log(empires[stars[star].empire].resource+1)+1),3)\
-        *(stars[star].power/50+25) < self.strength:
+        if 5*empires[stars[star].empire].technologyMod*(stars[star].power/50+25)\
+        < self.strength:
             # Take away some of this empire's strength.
-            self.strength -= max((log(empires[stars[star].empire].resource+1)+1),3)\
-            *(stars[star].power/50+25)
+            self.strength -= 5*empires[stars[star].empire].technologyMod*(stars[star].power/50+25)
             #print(star)
             #print(self.id)
             #print(stars[star].find())
             #print(stars[star].empire)
             #print(self.controlledStars)
             #print(empires[stars[star].empire].controlledStars)
-            # Add the star to this empire's controlledStars.
-            self.controlledStars.append(star)
-            # Take the star away from the target's controlledStars.
-            empires[stars[star].empire].controlledStars.remove(star)
+            if star in empires[stars[star].empire].controlledStars:
+                # Add the star to this empire's controlledStars.
+                self.controlledStars.append(star)
+                # Take the star away from the target's controlledStars.
+                empires[stars[star].empire].controlledStars.remove(star)
+            else:
+                return 0
             # Check to see if the target now has 0 stars. If so, delete that
             # empire and change the empire ids of all empires.
             if len(empires[stars[star].empire].controlledStars) == 0:
@@ -455,6 +468,9 @@ class Empire:
                     stars[star].revoltTimer = 2
                     stars[star].revolt = True
                     stars[star].changed = True
+            newEmpire.technology = self.technology-4
+            newEmpire.technologyMod = 1.04**newEmpire.technology
+            newEmpire.strength *= newEmpire.technologyMod
             empires.append(newEmpire)
             self.revoltRiskMod -= 0.5
 
@@ -469,14 +485,18 @@ class Empire:
             # Also ticks up the strength and resource of this empire.
             stars[self.controlledStars[i]].empire = self.id
             stars[self.controlledStars[i]].empireColor = self.influenceColor
-        self.strength += 0.01*self.controlledPower
-        self.resource += 0.15*self.controlledPower**0.8
-        self.revoltRiskMod += 0.00003*len(self.controlledStars)
-        self.revoltRisk = max((log10(len(self.controlledStars))-1.5)\
-        /(60+self.resource**0.28),0)*self.revoltRiskMod
+        self.strength += 0.01*self.technologyMod*self.controlledPower
+        self.resource += 0.15*self.technologyMod*self.controlledPower**0.8
         # Determine which stars can call which function.
         self.organizeStars()
         if len(self.controlledStars) > 0:
+            self.revoltRiskMod += 0.00003*len(self.controlledStars)
+            self.revoltRisk = max((log10(len(self.controlledStars))-1.5)\
+            /100,0)*self.revoltRiskMod
+
+            if self.revolutionTimer > 0:
+                self.revoltRisk += 0.025
+
             if self.nextAction == "develop" and self.resource > 40:
                 # Add 2 power to a random star.
                 if len(self.controlledStars) == 1:
@@ -486,6 +506,7 @@ class Empire:
                 stars[self.controlledStars[r]].power += 2
                 self.resource -= 40
                 self.determineNextAction()
+
             if self.nextAction == "colonize" and self.resource > 100:
                 # If there are stars left to colonize, do so. Otherwise,
                 # determine another action. Only determines another action if
@@ -496,6 +517,7 @@ class Empire:
                     self.determineNextAction()
                 else:
                     self.determineNextAction()
+
             if self.nextAction == "conquer":
                 # If there are stars left to conquer, do so. Otherwise,
                 # if there is more than 100 resource, increment strength by 100.
@@ -509,17 +531,29 @@ class Empire:
                     self.determineNextAction()
                 else:
                     self.determineNextAction()
-            if random() < REVOLUTIONARY_WAVE_CHANCE and len(self.controlledStars) > 100:
-                self.revoltRiskMod += 10
+
+            if random() < REVOLUTIONARY_WAVE_CHANCE and len(self.controlledStars) > 80:
+                self.revoltRiskMod += 50
+                self.revolutionTimer = 1000
+            if self.revolutionTimer > 0:
+                self.revolutionTimer -= 1
+            elif self.revolutionTimer == 0:
+                self.revoltRiskMod = -2
+                self.revolutionTimer = -1
             if random() < self.revoltRisk:
                 self.revolt()
+
+            while self.resource > 50000*self.technologyMod**1.2:
+                self.research()
+
             for i in range(len(self.controlledStars)):
                 stars[self.controlledStars[i]].empire = self.id
         # Print the status of the empire to the console.
         if PRINT_EMPIRE_STATUS:
-            print(str(self.id)+" has "+str(round(self.resource,3))+" resource, "\
+            print(str(self.number)+" "+str(self.influenceColor)+" has "+str(round(self.resource,3))+" resource, "\
             +str(round(self.strength,3))+" strength, "+str(len(self.controlledStars))\
-            +" stars, "+str(self.controlledPower)+" power, "+str(self.revoltRiskMod)+" mod")
+            +" stars, "+str(self.controlledPower)+" power, "+str(round(self.revoltRiskMod,5))+" unrest, and "\
+            +str(self.technology)+" tech")
 
 # Generate the stars
 for i in range(NUMBER_OF_STARS):
@@ -629,7 +663,6 @@ def spawnEmpire(empireId):
     print(r,alltimeEmpires,stars[r].empire)
     if stars[r].empire == -1 and len(stars[r].find()) == 0:
         empires.append(Empire(empireId,r,1))
-        alltimeEmpires += 1
     else:
         print("respawn")
         spawnEmpire(empireId)
