@@ -2,6 +2,7 @@ from random import *
 from time import *
 from graphics import *
 from math import *
+from tkinter import *
 
 # You can change these
 SCREEN_HEIGHT = 900
@@ -23,12 +24,12 @@ REVOLUTIONARY_WAVE_CHANCE = 0.0002
 STAR_DISPLAY_RADIUS_EXP = 6/12
 STAR_DISPLAY_RADIUS_MOD = 0.8
 STAR_DISPLAY_RADIUS_BASE = 3
-STAR_DISPLAY_MAX_RADIUS = 15
+STAR_DISPLAY_MAX_RADIUS = 40
 
 ISOLATED_CHECK_DRAW = True
 DRAW_LINKS = True
 UPDATE_LINKS = False
-PRINT_EMPIRE_STATUS = True
+PRINT_EMPIRE_STATUS = False
 
 TURN_DELAY = 0.04 # In seconds
 
@@ -47,9 +48,38 @@ t = time.time()
 t3 = time.time()
 frame = 0
 timer = 0
+mapMode = 1 # 1 = normal, 2 = tech, 3 = unrest
+lowestTech = 0
+highestTech = 0
+lowestUnrest = 0
+highestUnrest = 0
 open = True
 
 alltimeEmpires = 0
+
+keysPressed = []
+
+def down(e):
+    global keysPressed
+    if (len(keysPressed) == 0):
+        keysPressed.append(e.char)
+    else:
+        notIn = True
+        for i in range(len(keysPressed)-1, -1, -1):
+            if e.char == keysPressed[i]:
+                notIn = False
+        if notIn == True:
+            keysPressed.append(e.char)
+
+
+def up(e):
+    global keysPressed
+    for i in range(len(keysPressed)-1, -1, -1):
+        if e.char == keysPressed[i]:
+            del keysPressed[i]
+
+win.master.bind_all('<KeyPress>', down)
+win.master.bind_all('<KeyRelease>', up)
 
 def add(v1,v2):
     return [v1[0]+v2[0],v1[1]+v2[1]]
@@ -150,6 +180,7 @@ class Star:
         self.turnsPassed = 0
         self.revoltTimer = 0
         self.revolt = False
+        self.mapMode = 1
 
     def draw(self):
         # Draws the star and its corresponding empire circle. Note: the empire
@@ -161,14 +192,46 @@ class Star:
             self.empireColor = [255,255,255]
         if self.empire != -1:
             self.circle = Circle(vecToPt(self.pos),self.radius)
-            self.circle.setOutline(color_rgb(\
-            self.empireColor[0],\
-            self.empireColor[1],\
-            self.empireColor[2]))
-            self.circle.setFill(color_rgb(\
-            self.empireColor[0],\
-            self.empireColor[1],\
-            self.empireColor[2]))
+            global mapMode
+            if mapMode == 1:
+                self.circle.setOutline(color_rgb(\
+                self.empireColor[0],\
+                self.empireColor[1],\
+                self.empireColor[2]))
+                self.circle.setFill(color_rgb(\
+                self.empireColor[0],\
+                self.empireColor[1],\
+                self.empireColor[2]))
+            if mapMode == 2:
+                green = 0
+                global highestTech
+                global lowestTech
+                if highestTech-lowestTech != 0:
+                    green = (empires[self.empire].technology-lowestTech)/highestTech-lowestTech
+                else:
+                    green = 0.5
+                self.circle.setOutline(color_rgb(\
+                20,\
+                max(min(round(green*235+20),255),0),\
+                20))
+                self.circle.setFill(color_rgb(\
+                20,\
+                max(min(round(green*235+20),255),0),\
+                20))
+            if mapMode == 3:
+                red = 0
+                if highestUnrest-lowestUnrest != 0:
+                    red = (empires[self.empire].revoltRisk-lowestUnrest)/highestUnrest-lowestUnrest
+                else:
+                    red = 0.5
+                self.circle.setOutline(color_rgb(\
+                max(min(round(red*235+20),255),0),\
+                20,\
+                20))
+                self.circle.setFill(color_rgb(\
+                max(min(round(red*235+20),255),0),\
+                20,\
+                20))
             self.circle.draw(win)
         self.point = Point(self.pos[0],self.pos[1])
         self.point.setOutline(self.color)
@@ -186,6 +249,10 @@ class Star:
         if self.radius != self.oldRadius:
             self.changed = True
             self.oldRadius = self.radius
+        global mapMode
+        if self.mapMode != mapMode:
+            self.changed = True
+            self.mapMode = mapMode
         if self.empire != -1:
             if self.empire in list(range(len(empires))):
                 if empires[self.empire].originStar == self.id:
@@ -676,6 +743,13 @@ while open:
     # Turn loop
     if (time.time() > t3+TURN_DELAY):
         print(timer)
+        if "1" in keysPressed:
+            mapMode = 1
+        elif "2" in keysPressed:
+            mapMode = 2
+        elif "3" in keysPressed:
+            mapMode = 3
+        print(mapMode)
         if (timer % 10 == 0):
             for empire in empires:
                 points.append(DataPoint(\
@@ -687,6 +761,24 @@ while open:
                 if point.age > 1500:
                     del points[i]
         if timer % 20 == 0:
+            highestTech = -1000
+            lowestTech = 1000
+            highestUnrest = -1000
+            lowestUnrest = 1000
+            for empire in empires:
+                print(empire.revoltRisk)
+                if empire.technology > highestTech:
+                    highestTech = empire.technology
+                if empire.technology < lowestTech:
+                    lowestTech = empire.technology
+                if empire.revoltRisk > highestUnrest:
+                    highestUnrest = empire.revoltRisk
+                if empire.revoltRisk < lowestUnrest:
+                    lowestUnrest = empire.revoltRisk
+            print(highestTech)
+            print(lowestTech)
+            print(highestUnrest)
+            print(lowestUnrest)
             # Make sure a star can only be controlled by one empire.
             for star in stars:
                 for i,empireId in enumerate(star.find()):
